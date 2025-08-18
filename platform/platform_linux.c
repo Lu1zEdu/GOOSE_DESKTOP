@@ -1,30 +1,34 @@
-// platform/platform_linux.c
+// platform/platform_linux.c (Versão Corrigida)
+
 #ifdef __linux__
 
 #include "platform.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <X11/Xatom.h> // <- CORREÇÃO: Adicionado para XA_ATOM
+#include <X11/Xatom.h>
 #include <unistd.h>
-#include <stdlib.h> // Para a função system()
+#include <stdlib.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb_image.h"
 
-// Variáveis globais para Linux/X11
 static Display* g_display;
 static Window g_window;
 static GC g_gc;
-static Pixmap g_pixmap_backbuffer;  // Backbuffer para desenho sem flicker
-static Pixmap g_pixmap_mud_buffer;  // Buffer persistente para a lama
+static Pixmap g_pixmap_backbuffer;
+static Pixmap g_pixmap_mud_buffer;
 static int g_screen_width, g_screen_height;
 static int g_depth;
 
-// CORREÇÃO: Assinatura da função corrigida para bater com o platform.h
-bool platform_init(const char* app_name, int width, int height) {
+// 1. platform_init agora SÓ estabelece a conexão
+bool platform_init(const char* app_name) {
     g_display = XOpenDisplay(NULL);
     if (!g_display) return false;
+    return true;
+}
 
+// 2. platform_create_window agora SÓ cria a janela e os buffers
+void platform_create_window(int width, int height) {
     g_screen_width = width;
     g_screen_height = height;
 
@@ -32,7 +36,7 @@ bool platform_init(const char* app_name, int width, int height) {
     
     XVisualInfo vinfo;
     if (!XMatchVisualInfo(g_display, DefaultScreen(g_display), 32, TrueColor, &vinfo)) {
-        return false; // Exige 32-bit de cor para transparência
+        exit(1);
     }
     g_depth = vinfo.depth;
     
@@ -58,12 +62,10 @@ bool platform_init(const char* app_name, int width, int height) {
     g_pixmap_backbuffer = XCreatePixmap(g_display, g_window, width, height, g_depth);
     g_pixmap_mud_buffer = XCreatePixmap(g_display, g_window, width, height, g_depth);
     
-    // Limpa o buffer da lama com transparência
     XSetForeground(g_display, g_gc, 0x00000000);
     XFillRectangle(g_display, g_pixmap_mud_buffer, g_gc, 0, 0, width, height);
-
-    return true;
 }
+
 
 void platform_cleanup() {
     XFreePixmap(g_display, g_pixmap_backbuffer);
@@ -73,6 +75,7 @@ void platform_cleanup() {
     XCloseDisplay(g_display);
 }
 
+// O resto do arquivo permanece o mesmo...
 bool platform_handle_events() {
     XEvent event;
     while (XPending(g_display) > 0) {
@@ -93,25 +96,21 @@ void platform_sleep(int milliseconds) {
 Sprite* platform_load_sprite(const char* file_path) {
     Sprite* sprite = (Sprite*)malloc(sizeof(Sprite));
     if (!sprite) return NULL;
-
     int channels;
     sprite->data = stbi_load(file_path, &sprite->width, &sprite->height, &channels, 4);
     if (!sprite->data) {
         free(sprite);
         return NULL;
     }
-    
     for (int i = 0; i < sprite->width * sprite->height * 4; i += 4) {
         unsigned char r = sprite->data[i];
         unsigned char b = sprite->data[i+2];
         sprite->data[i] = b;
         sprite->data[i+2] = r;
     }
-
     XImage* ximage = XCreateImage(g_display, DefaultVisual(g_display, DefaultScreen(g_display)), 
                                   g_depth, ZPixmap, 0, (char*)sprite->data, 
                                   sprite->width, sprite->height, 32, 0);
-
     sprite->platform_handle = ximage;
     return sprite;
 }
@@ -124,7 +123,6 @@ void platform_destroy_sprite(Sprite* sprite) {
 }
 
 void platform_begin_drawing() {
-    // Copia o estado atual da lama para o backbuffer
     XCopyArea(g_display, g_pixmap_mud_buffer, g_pixmap_backbuffer, g_gc, 0, 0, g_screen_width, g_screen_height, 0, 0);
 }
 
@@ -134,7 +132,6 @@ void platform_draw_sprite_frame(Sprite* sprite, int dest_x, int dest_y, int src_
 }
 
 void platform_draw_footprint(Sprite* sprite, int src_x, int src_y, int src_w, int src_h, int dest_x, int dest_y) {
-    // Desenha a pegada diretamente no buffer da lama
     XImage* ximage = (XImage*)sprite->platform_handle;
     XPutImage(g_display, g_pixmap_mud_buffer, g_gc, ximage, src_x, src_y, dest_x, dest_y, src_w, src_h);
 }
@@ -164,8 +161,6 @@ void platform_set_mouse_position(int x, int y) {
 }
 
 void platform_play_sound(const char* file_path) {
-    // Usa um player de linha de comando. 'aplay' é comum.
-    // O '&' no final faz com que o comando rode em background para não travar o jogo.
     char command[256];
     snprintf(command, sizeof(command), "aplay %s > /dev/null 2>&1 &", file_path);
     system(command);

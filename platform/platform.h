@@ -1,4 +1,5 @@
-// platform/platform.h
+// platform/platform.h (Versão Corrigida)
+
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
@@ -14,7 +15,8 @@ typedef struct {
 typedef struct { int x; int y; } Point;
 
 // --- Funções do Ciclo de Vida ---
-bool platform_init(const char* app_name, int width, int height);
+bool platform_init(const char* app_name); // Não precisa mais de width/height aqui
+void platform_create_window(int width, int height); // Nova função dedicada
 void platform_cleanup();
 
 // --- Funções de Eventos e Loop ---

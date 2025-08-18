@@ -1,4 +1,4 @@
-// main.c (Versão Corrigida)
+// main.c (Versão Final e Corrigida)
 
 #include "platform/platform.h"
 #include <stdlib.h>
@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <math.h>
 
-// --- Configurações do Ganso ---
+// --- Configurações do Ganso e outras definições...
+// (TODA ESTA PARTE FICA IGUAL, NÃO PRECISA MUDAR)
 #define FRAME_WIDTH 34
 #define FRAME_HEIGHT 34
 #define GOOSE_SPEED 3
@@ -20,85 +21,72 @@
 #define MAX_MEMES 5
 #define MAX_FOOTPRINTS 100
 
-// --- Definições de Animação (Coordenadas na SpriteSheet.png) ---
 typedef struct { int x; int y; } Frame;
 Frame anim_walk_down[]  = {{0, 0}, {1, 0}, {2, 0}, {3, 0}};
 Frame anim_walk_up[]    = {{0, 1}, {1, 1}, {2, 1}, {3, 1}};
 Frame anim_walk_left[]  = {{0, 2}, {1, 2}, {2, 2}, {3, 2}};
 Frame anim_walk_right[] = {{0, 3}, {1, 3}, {2, 3}, {3, 3}};
-Frame footprint_frame   = {12, 14}; // Pegada de lama
+Frame footprint_frame   = {12, 14};
 
-// --- Estados do Ganso ---
 typedef enum {
-    IDLE,
-    WALKING,
-    CHASING_MOUSE,
-    DRAGGING_MOUSE,
-    SPAWNING_MEME,
-    HONKING
+    IDLE, WALKING, CHASING_MOUSE, DRAGGING_MOUSE, SPAWNING_MEME, HONKING
 } GooseState;
 
-// --- Estruturas de Dados ---
 typedef struct {
-    int x, y;
-    int dx, dy;
+    int x, y, dx, dy;
     float target_x, target_y;
     GooseState state;
     long long state_timer_ms;
-
-    // Animação
     Frame* current_anim;
     int current_frame_index;
     long long anim_timer_ms;
-
 } Goose;
 
 typedef struct { int x, y; bool active; } Meme;
 typedef struct { int x, y; bool active; } Footprint;
 
-// --- Função para mudar o estado ---
 void set_goose_state(Goose* goose, GooseState new_state, int screen_width, int screen_height) {
     goose->state = new_state;
-    goose->state_timer_ms = (rand() % 3000) + 2000; // Duração padrão
-
+    goose->state_timer_ms = (rand() % 3000) + 2000;
     switch (new_state) {
-        case IDLE:
-            goose->dx = 0; goose->dy = 0;
-            break;
+        case IDLE: goose->dx = 0; goose->dy = 0; break;
         case WALKING:
             goose->target_x = rand() % screen_width;
             goose->target_y = rand() % screen_height;
             break;
-        case CHASING_MOUSE:
-            goose->state_timer_ms = (rand() % 8000) + 5000; // Persegue por mais tempo
-            break;
+        case CHASING_MOUSE: goose->state_timer_ms = (rand() % 8000) + 5000; break;
         case SPAWNING_MEME:
-            goose->target_x = -FRAME_WIDTH * 2; // Vai para fora da tela à esquerda
+            goose->target_x = -FRAME_WIDTH * 2;
             goose->target_y = rand() % (screen_height - 100) + 50;
-            goose->state_timer_ms = 20000; // Tempo para buscar e largar o meme
+            goose->state_timer_ms = 20000;
             break;
         case HONKING:
             platform_play_sound("assets/honk.wav");
             goose->dx = 0; goose->dy = 0;
-            goose->state_timer_ms = 1000; // Duração do honk
+            goose->state_timer_ms = 1000;
             break;
         default: break;
     }
 }
+// (FIM DA PARTE QUE FICA IGUAL)
+
 
 // --- Função principal ---
 int main() {
     srand(time(NULL));
 
-    int screen_width, screen_height;
-    
     // ================== A CORREÇÃO ESTÁ AQUI ==================
-    // Primeiro, inicializamos a plataforma para estabelecer a conexão
-    // Depois que a conexão existe, aí sim pegamos o tamanho da tela
-    platform_get_screen_dimensions(&screen_width, &screen_height);
-    if (!platform_init("Irritating Goose", screen_width, screen_height)) {
+    // 1. Primeiro, inicializamos a plataforma para estabelecer a conexão
+    if (!platform_init("Irritating Goose")) {
          return 1;
     }
+
+    // 2. Agora que a conexão existe, pegamos o tamanho da tela
+    int screen_width, screen_height;
+    platform_get_screen_dimensions(&screen_width, &screen_height);
+
+    // 3. Com o tamanho, finalmente criamos nossa janela
+    platform_create_window(screen_width, screen_height);
     // ==========================================================
 
     // Carregar assets
@@ -109,14 +97,13 @@ int main() {
         return 1;
     }
 
-    // Inicializar ganso
+    // O resto do código é o mesmo de antes...
     Goose goose = {0};
     goose.x = screen_width / 2;
     goose.y = screen_height / 2;
     goose.current_anim = anim_walk_down;
     set_goose_state(&goose, WALKING, screen_width, screen_height);
     
-    // Inicializar "irritações"
     Meme memes[MAX_MEMES] = {0};
     int meme_count = 0;
     Footprint footprints[MAX_FOOTPRINTS] = {0};
@@ -125,23 +112,19 @@ int main() {
     long long next_honk_timer = (rand() % (HONK_INTERVAL_MAX - HONK_INTERVAL_MIN)) + HONK_INTERVAL_MIN;
     long long footprint_timer = FOOTPRINT_INTERVAL;
 
-    // Loop principal
     bool running = true;
     while (running) {
         running = platform_handle_events();
         
-        // --- ATUALIZAÇÃO DOS TIMERS ---
-        goose.state_timer_ms -= 16; // Aproximadamente 16ms por frame (~60 FPS)
+        goose.state_timer_ms -= 16;
         goose.anim_timer_ms -= 16;
         next_meme_timer -= 16;
         next_honk_timer -= 16;
         footprint_timer -= 16;
         
-        // --- LÓGICA DE ESTADO DO GANSO ---
         Point mouse_pos = platform_get_mouse_position();
         float dist_to_mouse = hypot(goose.x - mouse_pos.x, goose.y - mouse_pos.y);
 
-        // Decidir novo estado aleatoriamente
         if (goose.state_timer_ms <= 0) {
             int next_state = rand() % 100;
             if (next_state < 60) set_goose_state(&goose, WALKING, screen_width, screen_height);
@@ -157,8 +140,6 @@ int main() {
             next_honk_timer = (rand() % (HONK_INTERVAL_MAX - HONK_INTERVAL_MIN)) + HONK_INTERVAL_MIN;
         }
 
-
-        // Lógica de cada estado
         if (goose.state == WALKING || goose.state == CHASING_MOUSE || goose.state == SPAWNING_MEME) {
             if(goose.state == CHASING_MOUSE) {
                 goose.target_x = mouse_pos.x;
@@ -167,31 +148,25 @@ int main() {
                     goose.state = DRAGGING_MOUSE;
                 }
             }
-
             float angle = atan2(goose.target_y - goose.y, goose.target_x - goose.x);
             int speed = (goose.state == CHASING_MOUSE) ? GOOSE_RUN_SPEED : GOOSE_SPEED;
             goose.dx = cos(angle) * speed;
             goose.dy = sin(angle) * speed;
-            
-            // Escolher animação baseada na direção
             if (abs(goose.dx) > abs(goose.dy)) {
                 goose.current_anim = (goose.dx > 0) ? anim_walk_right : anim_walk_left;
             } else {
                 goose.current_anim = (goose.dy > 0) ? anim_walk_down : anim_walk_up;
             }
-
             if (goose.state == SPAWNING_MEME && goose.x < 10 && meme_count < MAX_MEMES) {
                 memes[meme_count].active = true;
-                memes[meme_count].x = -meme_sprite->width; // Começa fora da tela
+                memes[meme_count].x = -meme_sprite->width;
                 memes[meme_count].y = goose.y;
                 set_goose_state(&goose, WALKING, screen_width, screen_height);
                 meme_count++;
             }
-
         } else if (goose.state == DRAGGING_MOUSE) {
             platform_set_mouse_position(goose.x, goose.y);
-            // O ganso agora passeia aleatoriamente arrastando o mouse
-            if (goose.state_timer_ms % 1000 < 20) { // Mudar de direção a cada segundo
+            if (goose.state_timer_ms % 1000 < 20) {
                 goose.target_x = rand() % screen_width;
                 goose.target_y = rand() % screen_height;
             }
@@ -200,7 +175,6 @@ int main() {
             goose.dy = sin(angle) * GOOSE_SPEED;
         }
 
-        // Atualizar posição e animação
         goose.x += goose.dx;
         goose.y += goose.dy;
         
@@ -209,7 +183,6 @@ int main() {
             goose.anim_timer_ms = 100;
         }
 
-        // Adicionar pegadas
         if ((goose.state == WALKING || goose.state == CHASING_MOUSE) && footprint_timer <= 0) {
             footprints[footprint_index].active = true;
             footprints[footprint_index].x = goose.x;
@@ -218,10 +191,7 @@ int main() {
             footprint_timer = FOOTPRINT_INTERVAL;
         }
         
-        // --- DESENHO ---
         platform_begin_drawing();
-
-        // Desenhar pegadas
         for (int i = 0; i < MAX_FOOTPRINTS; ++i) {
             if (footprints[i].active) {
                 platform_draw_footprint(goose_spritesheet, 
@@ -229,21 +199,15 @@ int main() {
                     footprints[i].x, footprints[i].y);
             }
         }
-        
-        // Desenhar memes
         for (int i = 0; i < MAX_MEMES; ++i) {
             if (memes[i].active) {
-                // Animar o meme entrando na tela
                 if(memes[i].x < 20 * (i + 1)) memes[i].x += 5;
                 platform_draw_sprite_frame(meme_sprite, memes[i].x, memes[i].y, 0, 0, meme_sprite->width, meme_sprite->height);
             }
         }
-        
-        // Desenhar o ganso
         Frame current_frame = goose.current_anim[goose.current_frame_index];
         platform_draw_sprite_frame(goose_spritesheet, goose.x, goose.y, 
             current_frame.x * FRAME_WIDTH, current_frame.y * FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT);
-
         platform_end_drawing();
         platform_sleep(16);
     }
