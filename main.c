@@ -1,4 +1,5 @@
-// main.c
+// main.c (Versão Corrigida)
+
 #include "platform/platform.h"
 #include <stdlib.h>
 #include <time.h>
@@ -90,9 +91,15 @@ int main() {
     srand(time(NULL));
 
     int screen_width, screen_height;
-    platform_get_screen_dimensions(&screen_width, &screen_height);
     
-    if (!platform_init("Irritating Goose", screen_width, screen_height)) return 1;
+    // ================== A CORREÇÃO ESTÁ AQUI ==================
+    // Primeiro, inicializamos a plataforma para estabelecer a conexão
+    // Depois que a conexão existe, aí sim pegamos o tamanho da tela
+    platform_get_screen_dimensions(&screen_width, &screen_height);
+    if (!platform_init("Irritating Goose", screen_width, screen_height)) {
+         return 1;
+    }
+    // ==========================================================
 
     // Carregar assets
     Sprite* goose_spritesheet = platform_load_sprite("assets/SpriteSheet.png");
@@ -124,7 +131,7 @@ int main() {
         running = platform_handle_events();
         
         // --- ATUALIZAÇÃO DOS TIMERS ---
-        goose.state_timer_ms -= 16;
+        goose.state_timer_ms -= 16; // Aproximadamente 16ms por frame (~60 FPS)
         goose.anim_timer_ms -= 16;
         next_meme_timer -= 16;
         next_honk_timer -= 16;
