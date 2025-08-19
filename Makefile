@@ -1,11 +1,7 @@
-# Makefile para compilar no Linux
-
 CC = gcc
 CFLAGS = -Wall -Wextra -g
+SOURCES = main.c platform/platform_linux.c utils/file_utils.c
 LDFLAGS = -lX11 -lm
-
-# Define os arquivos fonte baseado no SO
-SOURCES = main.c platform/platform_linux.c
 TARGET = goose
 
 all: $(TARGET)

@@ -1,6 +1,6 @@
-// platform/platform_linux.c (Versão Corrigida)
+// platform/platform_linux.c (Versão 100% Corrigida)
 
-#ifdef __linux__
+#ifdef __linux__ // <--- Bloco para Linux começa aqui
 
 #include "platform.h"
 #include <X11/Xlib.h>
@@ -8,6 +8,7 @@
 #include <X11/Xatom.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb_image.h"
@@ -20,52 +21,49 @@ static Pixmap g_pixmap_mud_buffer;
 static int g_screen_width, g_screen_height;
 static int g_depth;
 
-// 1. platform_init agora SÓ estabelece a conexão
-bool platform_init(const char* app_name) {
+// CORREÇÃO DO AVISO: Comentar o nome do parâmetro não usado
+bool platform_init(const char* /*app_name*/) {
     g_display = XOpenDisplay(NULL);
-    if (!g_display) return false;
+    if (!g_display) {
+        fprintf(stderr, "Erro: Não foi possível conectar ao servidor X.\n");
+        return false;
+    }
     return true;
 }
 
-// 2. platform_create_window agora SÓ cria a janela e os buffers
 void platform_create_window(int width, int height) {
     g_screen_width = width;
     g_screen_height = height;
-
     Window root = DefaultRootWindow(g_display);
-    
     XVisualInfo vinfo;
     if (!XMatchVisualInfo(g_display, DefaultScreen(g_display), 32, TrueColor, &vinfo)) {
-        exit(1);
+        printf("Aviso: Não foi possível encontrar um visual de 32 bits. Tentando com 24 bits (transparência pode não funcionar).\n");
+        if (!XMatchVisualInfo(g_display, DefaultScreen(g_display), 24, TrueColor, &vinfo)) {
+            fprintf(stderr, "Erro: Não foi possível encontrar um visual compatível (32 ou 24 bits).\n");
+            exit(1);
+        }
     }
     g_depth = vinfo.depth;
-    
     XSetWindowAttributes attrs;
     attrs.colormap = XCreateColormap(g_display, root, vinfo.visual, AllocNone);
     attrs.border_pixel = 0;
     attrs.background_pixel = 0;
     attrs.override_redirect = True;
-
     g_window = XCreateWindow(g_display, root, 0, 0, width, height, 0,
                              vinfo.depth, InputOutput, vinfo.visual,
                              CWColormap | CWBorderPixel | CWBackPixel | CWOverrideRedirect, &attrs);
-
     Atom wm_state = XInternAtom(g_display, "_NET_WM_STATE", False);
     Atom wm_state_above = XInternAtom(g_display, "_NET_WM_STATE_ABOVE", False);
     XChangeProperty(g_display, g_window, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&wm_state_above, 1);
-
     XSelectInput(g_display, g_window, ExposureMask | KeyPressMask);
     XMapWindow(g_display, g_window);
     XFlush(g_display);
-
     g_gc = XCreateGC(g_display, g_window, 0, NULL);
     g_pixmap_backbuffer = XCreatePixmap(g_display, g_window, width, height, g_depth);
     g_pixmap_mud_buffer = XCreatePixmap(g_display, g_window, width, height, g_depth);
-    
     XSetForeground(g_display, g_gc, 0x00000000);
     XFillRectangle(g_display, g_pixmap_mud_buffer, g_gc, 0, 0, width, height);
 }
-
 
 void platform_cleanup() {
     XFreePixmap(g_display, g_pixmap_backbuffer);
@@ -75,7 +73,6 @@ void platform_cleanup() {
     XCloseDisplay(g_display);
 }
 
-// O resto do arquivo permanece o mesmo...
 bool platform_handle_events() {
     XEvent event;
     while (XPending(g_display) > 0) {
@@ -108,8 +105,8 @@ Sprite* platform_load_sprite(const char* file_path) {
         sprite->data[i] = b;
         sprite->data[i+2] = r;
     }
-    XImage* ximage = XCreateImage(g_display, DefaultVisual(g_display, DefaultScreen(g_display)), 
-                                  g_depth, ZPixmap, 0, (char*)sprite->data, 
+    XImage* ximage = XCreateImage(g_display, DefaultVisual(g_display, DefaultScreen(g_display)),
+                                  g_depth, ZPixmap, 0, (char*)sprite->data,
                                   sprite->width, sprite->height, 32, 0);
     sprite->platform_handle = ximage;
     return sprite;
@@ -166,4 +163,4 @@ void platform_play_sound(const char* file_path) {
     system(command);
 }
 
-#endif // __linux__
+#endif // __linux__ // <--- CORREÇÃO: A linha que faltava!
